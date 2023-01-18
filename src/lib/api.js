@@ -425,4 +425,19 @@ export default class RocketChatInstance {
       console.error(err.message);
     }
   }
+
+  async UserAvatar(Username) {
+    try {
+      const response = await fetch(
+        `${this.host}/api/v1/users.getAvatar?username=${Username}`,
+        {
+          mode: 'no-cors',
+          method: 'GET',
+        }
+      );
+      return await response;
+    } catch (err) {
+      console.error(err.message);
+    }
+  }
 }
