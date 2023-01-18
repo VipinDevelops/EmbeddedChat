@@ -7,6 +7,7 @@ import {
   Button,
   Icon,
   Message,
+  Avatar,
   MessageReactions,
   MessageToolbox,
   MessageDivider,
@@ -33,6 +34,7 @@ const MessageList = ({ messages, handleGoBack }) => {
 
   const filtered = useMessageStore((state) => state.filtered);
   const toastPosition = useToastStore((state) => state.position);
+  const avatarUrl = useUserStore((state) => state.avatarUrl);
 
   const { editMessage, setEditMessage } = useMessageStore((state) => ({
     editMessage: state.editMessage,
@@ -121,23 +123,43 @@ const MessageList = ({ messages, handleGoBack }) => {
                       {format(new Date(msg.ts), 'MMMM d, yyyy')}
                     </MessageDivider>
                   )}
-                  <Message.Header>
-                    <Message.Name>{msg.u?.name}</Message.Name>
-                    <Message.Username>@{msg.u.username}</Message.Username>
-                    <Message.Timestamp>
-                      {format(new Date(msg.ts), 'h:mm a')}
-                    </Message.Timestamp>
-                    {msg.editedAt && (
-                      <Icon mie="x4" opacity={0.5} name="edit" size="x16" />
-                    )}
-                  </Message.Header>
-                  <Message.Body>
-                    {msg.attachments && msg.attachments.length > 0 ? (
-                      <Attachments attachments={msg.attachments} />
-                    ) : (
-                      <Markdown body={msg.msg} />
-                    )}
-                  </Message.Body>
+
+                  <Box display="flex">
+                    {/* Avatar */}
+                    <Message.LeftContainer>
+                      <Avatar
+                        url={
+                          // authenticatedUserUsername === msg.u.username
+                          // ?
+                          // avatarUrl
+                          // : getUserAvatar(msg.u.username)
+                          msg.u.avatar_url
+                        }
+                        size="x36"
+                        alt="avatar"
+                      />
+                    </Message.LeftContainer>
+
+                    <Box>
+                      <Message.Header>
+                        <Message.Name>{msg.u?.name}</Message.Name>
+                        <Message.Username>@{msg.u.username}</Message.Username>
+                        <Message.Timestamp>
+                          {format(new Date(msg.ts), 'h:mm a')}
+                        </Message.Timestamp>
+                        {msg.editedAt && (
+                          <Icon mie="x4" opacity={0.5} name="edit" size="x16" />
+                        )}
+                      </Message.Header>
+                      <Message.Body>
+                        {msg.attachments && msg.attachments.length > 0 ? (
+                          <Attachments attachments={msg.attachments} />
+                        ) : (
+                          <Markdown body={msg.msg} />
+                        )}
+                      </Message.Body>
+                    </Box>
+                  </Box>
                   <MessageReactions>
                     {msg.reactions &&
                       serializeReactions(msg.reactions).map((reaction) => (
