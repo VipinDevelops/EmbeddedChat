@@ -131,9 +131,9 @@ const MessageList = ({ messages, handleGoBack }) => {
                         url={
                           // authenticatedUserUsername === msg.u.username
                           // ?
-                          // avatarUrl
+                          avatarUrl
                           // : getUserAvatar(msg.u.username)
-                          msg.u.avatar_url
+                          // msg.u.avatar_url
                         }
                         size="x36"
                         alt="avatar"
