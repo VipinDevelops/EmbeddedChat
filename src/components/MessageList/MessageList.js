@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 import React, { useContext } from 'react';
 import PropTypes from 'prop-types';
 import { isSameDay, format } from 'date-fns';
@@ -19,10 +18,16 @@ import Cookies from 'js-cookie';
 import { EmojiPicker } from '../EmojiPicker/index';
 import { Markdown } from '../Markdown/index';
 import RCContext from '../../context/RCInstance';
-import { useMessageStore, useToastStore, useUserStore } from '../../store';
+import {
+  useMessageStore,
+  useToastStore,
+  useUserStore,
+  useMemberStore,
+} from '../../store';
 import { isSameUser, serializeReactions } from '../../lib/reaction';
 import { Attachments } from '../Attachments';
 import { RC_USER_ID_COOKIE } from '../../lib/constant';
+import RoomMembers from '../RoomMembers/RoomMember';
 
 const MessageList = ({ messages, handleGoBack }) => {
   const { RCInstance } = useContext(RCContext);
@@ -40,6 +45,9 @@ const MessageList = ({ messages, handleGoBack }) => {
     editMessage: state.editMessage,
     setEditMessage: state.setEditMessage,
   }));
+
+  const showMembers = useMemberStore((state) => state.showMembers);
+  const members = useMemberStore((state) => state.members);
 
   const handleStarMessage = async (message) => {
     const isStarred =
@@ -107,6 +115,23 @@ const MessageList = ({ messages, handleGoBack }) => {
   const isMessageNewDay = (current, previous) =>
     !previous || !isSameDay(new Date(current.ts), new Date(previous.ts));
 
+  const userActions = (type, msg) => {
+    switch (type) {
+      case 'ul':
+        return 'left the channel';
+      case 'uj':
+        return 'joined the channel';
+      case 'ru':
+        return `removed @${msg.msg}`;
+      case 'au':
+        return `added @${msg.msg}`;
+      case 'message_pinned':
+        return 'Pinned a message:';
+      default:
+        return '';
+    }
+  };
+
   return (
     <>
       {messages &&
@@ -123,111 +148,146 @@ const MessageList = ({ messages, handleGoBack }) => {
                       {format(new Date(msg.ts), 'MMMM d, yyyy')}
                     </MessageDivider>
                   )}
+                  {!msg.t ? (
+                    <>
+                      <Box display="flex">
+                        {/* Avatar */}
+                        <Message.LeftContainer>
+                          <Avatar
+                            url={
+                              // authenticatedUserUsername === msg.u.username
+                              // ?
+                              avatarUrl
+                              // : getUserAvatar(msg.u.username)
+                              // msg.u.avatar_url
+                            }
+                            size="x36"
+                            alt="avatar"
+                          />
+                        </Message.LeftContainer>
 
-                  <Box display="flex">
-                    {/* Avatar */}
-                    <Message.LeftContainer>
-                      <Avatar
-                        url={
-                          // authenticatedUserUsername === msg.u.username
-                          // ?
-                          avatarUrl
-                          // : getUserAvatar(msg.u.username)
-                          // msg.u.avatar_url
-                        }
-                        size="x36"
-                        alt="avatar"
-                      />
-                    </Message.LeftContainer>
-
-                    <Box>
+                        <Box>
+                          <Message.Header>
+                            <Message.Name>{msg.u?.name}</Message.Name>
+                            <Message.Username>
+                              @{msg.u.username}
+                            </Message.Username>
+                            <Message.Timestamp>
+                              {format(new Date(msg.ts), 'h:mm a')}
+                            </Message.Timestamp>
+                            {msg.editedAt && (
+                              <Icon
+                                mie="x4"
+                                opacity={0.5}
+                                name="edit"
+                                size="x16"
+                              />
+                            )}
+                          </Message.Header>
+                          <Message.Body>
+                            {msg.attachments && msg.attachments.length > 0 ? (
+                              <Attachments attachments={msg.attachments} />
+                            ) : (
+                              <Markdown body={msg.msg} />
+                            )}
+                          </Message.Body>
+                        </Box>
+                      </Box>
+                      <MessageReactions>
+                        {msg.reactions &&
+                          serializeReactions(msg.reactions).map((reaction) => (
+                            <MessageReactions.Reaction
+                              key={reaction.name}
+                              mine={isSameUser(
+                                reaction,
+                                authenticatedUserUsername
+                              )}
+                              onClick={() =>
+                                handleEmojiClick(
+                                  reaction,
+                                  msg,
+                                  !isSameUser(
+                                    reaction,
+                                    authenticatedUserUsername
+                                  )
+                                )
+                              }
+                            >
+                              <Markdown body={reaction.name} />
+                              <p>{reaction.count}</p>
+                            </MessageReactions.Reaction>
+                          ))}
+                      </MessageReactions>
+                    </>
+                  ) : (
+                    <>
                       <Message.Header>
-                        <Message.Name>{msg.u?.name}</Message.Name>
-                        <Message.Username>@{msg.u.username}</Message.Username>
+                        <Message.Name>@{msg.u.username} </Message.Name>
+                        <Message.Username style={{ marginLeft: '2px' }}>
+                          {userActions(msg.t, msg)}
+                        </Message.Username>
                         <Message.Timestamp>
                           {format(new Date(msg.ts), 'h:mm a')}
                         </Message.Timestamp>
-                        {msg.editedAt && (
-                          <Icon mie="x4" opacity={0.5} name="edit" size="x16" />
-                        )}
                       </Message.Header>
-                      <Message.Body>
-                        {msg.attachments && msg.attachments.length > 0 ? (
-                          <Attachments attachments={msg.attachments} />
-                        ) : (
-                          <Markdown body={msg.msg} />
-                        )}
-                      </Message.Body>
-                    </Box>
-                  </Box>
-                  <MessageReactions>
-                    {msg.reactions &&
-                      serializeReactions(msg.reactions).map((reaction) => (
-                        <MessageReactions.Reaction
-                          key={reaction.name}
-                          mine={isSameUser(reaction, authenticatedUserUsername)}
-                          onClick={() =>
-                            handleEmojiClick(
-                              reaction,
-                              msg,
-                              !isSameUser(reaction, authenticatedUserUsername)
-                            )
-                          }
-                        >
-                          <Markdown body={reaction.name} />
-                          <p>{reaction.count}</p>
-                        </MessageReactions.Reaction>
-                      ))}
-                  </MessageReactions>
+                      {msg.attachments && (
+                        <Attachments attachments={msg.attachments} />
+                      )}
+                    </>
+                  )}
                 </Message.Container>
-                <MessageToolbox.Wrapper>
-                  <MessageToolbox>
-                    <MessageToolbox.Item icon="thread" />
-                    <MessageToolbox.Item
-                      icon={`${
-                        msg.starred &&
-                        msg.starred.find((u) => u._id === authenticatedUserId)
-                          ? 'star-filled'
-                          : 'star'
-                      }`}
-                      onClick={() => handleStarMessage(msg)}
-                    />
-                    <Popup
-                      trigger={
-                        <MessageToolbox.Item
-                          icon="emoji"
-                          onClick={() => console.log('saf')}
-                        />
-                      }
-                      position={isSmallScreen ? 'left top' : 'left center'}
-                    >
-                      <EmojiPicker
-                        handleEmojiClick={(_, e) =>
-                          handleEmojiClick(e, msg, true)
-                        }
+                {!msg.t ? (
+                  <MessageToolbox.Wrapper>
+                    <MessageToolbox>
+                      <MessageToolbox.Item icon="thread" />
+                      <MessageToolbox.Item
+                        icon={`${
+                          msg.starred &&
+                          msg.starred.find((u) => u._id === authenticatedUserId)
+                            ? 'star-filled'
+                            : 'star'
+                        }`}
+                        onClick={() => handleStarMessage(msg)}
                       />
-                    </Popup>
-                    <MessageToolbox.Item
-                      icon="pin"
-                      onClick={() => handlePinMessage(msg)}
-                    />
-                    {msg.u._id === authenticatedUserId && (
-                      <>
-                        <MessageToolbox.Item
-                          icon="edit"
-                          onClick={() => {
-                            setEditMessage({ msg: msg.msg, id: msg._id });
-                          }}
+                      <Popup
+                        trigger={
+                          <MessageToolbox.Item
+                            icon="emoji"
+                            onClick={() => console.log('saf')}
+                          />
+                        }
+                        position={isSmallScreen ? 'left top' : 'left center'}
+                      >
+                        <EmojiPicker
+                          handleEmojiClick={(_, e) =>
+                            handleEmojiClick(e, msg, true)
+                          }
                         />
-                        <MessageToolbox.Item
-                          icon="trash"
-                          color="danger"
-                          onClick={() => handleDeleteMessage(msg)}
-                        />
-                      </>
-                    )}
-                  </MessageToolbox>
-                </MessageToolbox.Wrapper>
+                      </Popup>
+                      <MessageToolbox.Item
+                        icon="pin"
+                        onClick={() => handlePinMessage(msg)}
+                      />
+                      {msg.u._id === authenticatedUserId && (
+                        <>
+                          <MessageToolbox.Item
+                            icon="edit"
+                            onClick={() => {
+                              setEditMessage({ msg: msg.msg, id: msg._id });
+                            }}
+                          />
+                          <MessageToolbox.Item
+                            icon="trash"
+                            color="danger"
+                            onClick={() => handleDeleteMessage(msg)}
+                          />
+                        </>
+                      )}
+                    </MessageToolbox>
+                  </MessageToolbox.Wrapper>
+                ) : (
+                  <></>
+                )}
               </Message>
             )
           );
@@ -240,6 +300,7 @@ const MessageList = ({ messages, handleGoBack }) => {
           </Button>
         </Box>
       )}
+      {showMembers && <RoomMembers members={members} />}
     </>
   );
 };
