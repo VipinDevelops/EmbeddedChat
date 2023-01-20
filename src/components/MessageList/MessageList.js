@@ -132,6 +132,11 @@ const MessageList = ({ messages, handleGoBack }) => {
     }
   };
 
+  const getUserAvatarURL = (username) => {
+    const host = 'http://localhost:3000';
+    return `${host}/avatar/${username}`;
+  };
+
   return (
     <>
       {messages &&
@@ -151,15 +156,12 @@ const MessageList = ({ messages, handleGoBack }) => {
                   {!msg.t ? (
                     <>
                       <Box display="flex">
-                        {/* Avatar */}
                         <Message.LeftContainer>
                           <Avatar
                             url={
-                              // authenticatedUserUsername === msg.u.username
-                              // ?
-                              avatarUrl
-                              // : getUserAvatar(msg.u.username)
-                              // msg.u.avatar_url
+                              authenticatedUserUsername === msg.u.username
+                                ? avatarUrl
+                                : getUserAvatarURL(msg.u.username)
                             }
                             size="x36"
                             alt="avatar"
