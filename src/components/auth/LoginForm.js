@@ -70,7 +70,7 @@ export default function LoginForm() {
           </Field>
           <Box marginWidth="25px 70px 25px 70px">
             <Button primary onClick={handleSubmit}>
-              Login
+              Login now
             </Button>
           </Box>
 
