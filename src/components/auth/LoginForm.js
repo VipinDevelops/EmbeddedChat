@@ -73,8 +73,7 @@ export default function LoginForm() {
               Login
             </Button>
           </Box>
-
-          <Modal.Footer alignItems="center">
+          <Modal.Footer>
             <Button secondary onClick={handleGooglewithLogin}>
               <Icon name="google" /> Login with Google
             </Button>
