@@ -68,7 +68,6 @@ export default function LoginForm() {
               <PasswordInput onChange={handleEditPassword} />
             </Field.Row>
           </Field>
-
           <Modal.Footer alignItems="center">
             <Box className={classes.Footer}>
               <Button
