@@ -6,6 +6,12 @@ _EmbeddedChat is a full-stack React component node module of the RocketChat appl
 
 ![embeddedchatwall](https://user-images.githubusercontent.com/73601258/178119162-ecabb9b7-e3ae-4c70-8ab2-f6c02856f4c6.png)
 
+<div align='center' width='100%'>
+<a href="https://github.com/monoclehq">
+<img src="https://open-source-assets.middlewarehq.com/svgs/RocketChat-EmbeddedChat-contributor-metrics-dark-widget.svg?caching=true"></img>
+</a>
+</div>
+
 ## Installation
 
 ```bash
@@ -57,6 +63,7 @@ Read this [wiki page](https://github.com/RocketChat/EmbeddedChat/wiki/Roots-of-E
 | anonymousMode    | if the user can see the chat without logging in                                                                                             |
 | showAvatar       | show the user's avatar in the chat component, defaults to false                                                                             |
 | showRoles        | show the user's roles in the chat component, defaults to false                                                                              |
+| enableThreads    | enable RocketChat's style thread messages, defaults to false                                                                             |
 
 ## Setting up Authentication
 

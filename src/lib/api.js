@@ -162,12 +162,22 @@ export default class RocketChatInstance {
       await this.rcClient.onMessage((data) => {
         this.onMessageCallbacks.map((callback) => callback(data));
       });
+      await this.rcClient.subscribe(
+        'stream-notify-room',
+        `${this.rid}/user-activity`
+      );
       await this.rcClient.subscribeRoom(this.rid);
       await this.rcClient.onStreamData('stream-notify-room', (ddpMessage) => {
         const [roomId, event] = ddpMessage.fields.eventName.split('/');
 
         if (roomId !== this.rid) {
           return;
+        }
+
+        if (event === 'user-activity') {
+          const typingUser = ddpMessage.fields.args[0];
+          const isTyping = ddpMessage.fields.args[1]?.includes('user-typing');
+          this.handleTypingEvent({ typingUser, isTyping });
         }
 
         if (event === 'typing') {
@@ -370,11 +380,24 @@ export default class RocketChatInstance {
     await this.rcClient.disconnect();
   }
 
-  async getMessages(anonymousMode = false) {
+  /**
+   * @param {boolean} anonymousMode
+   * @param {Object} options This object should include query or fields.
+   * query - json object which accepts MongoDB query operators.
+   * fields - json object with properties that have either 1 or 0 to include them or exclude them
+   * @returns messages
+   */
+  async getMessages(anonymousMode = false, options = {}) {
     const endp = anonymousMode ? 'anonymousread' : 'messages';
+    const query = options?.query
+      ? `&query=${JSON.stringify(options.query)}`
+      : '';
+    const field = options?.field
+      ? `&field=${JSON.stringify(options.field)}`
+      : '';
     try {
       const messages = await fetch(
-        `${this.host}/api/v1/channels.${endp}?roomId=${this.rid}`,
+        `${this.host}/api/v1/channels.${endp}?roomId=${this.rid}${query}${field}`,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -388,6 +411,14 @@ export default class RocketChatInstance {
     } catch (err) {
       console.log(err.message);
     }
+  }
+
+  async getThreadMessages(tmid) {
+    return this.getMessages(false, {
+      query: {
+        tmid,
+      },
+    });
   }
 
   async getChannelRoles() {
@@ -422,10 +453,27 @@ export default class RocketChatInstance {
     }
   }
 
-  async sendMessage(message) {
+  /**
+   * @param {*} message should be a string or an rc message object
+   * Refer https://developer.rocket.chat/reference/api/schema-definition/message#message-object
+   */
+  async sendMessage(message, threadId) {
+    const messageObj =
+      typeof message === 'string'
+        ? {
+            rid: this.rid,
+            msg: message,
+          }
+        : {
+            ...message,
+            rid: this.rid,
+          };
+    if (threadId) {
+      messageObj.tmid = threadId;
+    }
     try {
       const response = await fetch(`${this.host}/api/v1/chat.sendMessage`, {
-        body: JSON.stringify({ message: { rid: this.rid, msg: message } }),
+        body: JSON.stringify({ message: messageObj }),
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Token': Cookies.get(RC_USER_TOKEN_COOKIE),
@@ -615,9 +663,34 @@ export default class RocketChatInstance {
     }
   }
 
-  async sendAttachment(file, fileName, fileDescription = '') {
+  async findOrCreateInvite() {
+    try {
+      const response = await fetch(`${this.host}/api/v1/findOrCreateInvite`, {
+        method: 'POST',
+        body: JSON.stringify({ rid: this.rid, days: 1, maxUses: 10 }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': Cookies.get(RC_USER_TOKEN_COOKIE),
+          'X-User-Id': Cookies.get(RC_USER_ID_COOKIE),
+        },
+      });
+      return await response.json();
+    } catch (err) {
+      console.log(err.message);
+    }
+  }
+
+  async sendAttachment(
+    file,
+    fileName,
+    fileDescription = '',
+    threadId = undefined
+  ) {
     try {
       const form = new FormData();
+      if (threadId) {
+        form.append('tmid', threadId);
+      }
       form.append('file', file, fileName);
       form.append(
         'description',

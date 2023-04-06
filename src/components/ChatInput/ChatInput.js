@@ -15,9 +15,11 @@ import MembersList from '../Mentions/MembersList';
 import mentionmemberStore from '../../store/mentionmemberStore';
 import { searchToMentionUser } from '../../lib/searchToMentionUser';
 import TypingUsers from '../TypingUsers';
+import createPendingMessage from '../../lib/createPendingMessage';
+import { parseEmoji } from '../../lib/emoji';
 
 const ChatInput = () => {
-  const { RCInstance } = useContext(RCContext);
+  const { RCInstance, ECOptions } = useContext(RCContext);
   const inputRef = useRef(null);
   const typingRef = useRef();
   const messageRef = useRef();
@@ -38,16 +40,30 @@ const ChatInput = () => {
     (state) => state.setIsLoginModalOpen
   );
 
-  const { editMessage, setEditMessage, isRecordingMessage } = useMessageStore(
-    (state) => ({
-      editMessage: state.editMessage,
-      setEditMessage: state.setEditMessage,
-      isRecordingMessage: state.isRecordingMessage,
-    })
-  );
+  const {
+    editMessage,
+    setEditMessage,
+    isRecordingMessage,
+    upsertMessage,
+    replaceMessage,
+    threadId,
+  } = useMessageStore((state) => ({
+    editMessage: state.editMessage,
+    setEditMessage: state.setEditMessage,
+    isRecordingMessage: state.isRecordingMessage,
+    upsertMessage: state.upsertMessage,
+    replaceMessage: state.replaceMessage,
+    threadId: state.threadMainMessage?._id,
+  }));
 
   const toggle = useAttachmentWindowStore((state) => state.toggle);
   const setData = useAttachmentWindowStore((state) => state.setData);
+
+  const user = useUserStore((state) => ({
+    _id: state.userId,
+    username: state.username,
+    name: state.name,
+  }));
 
   const isUserAuthenticated = useUserStore(
     (state) => state.isUserAuthenticated
@@ -65,9 +81,10 @@ const ChatInput = () => {
   };
 
   const sendMessage = async () => {
-    messageRef.current.style.height = '38px';
-    const message = messageRef.current.value;
+    messageRef.current.style.height = '44px';
+    const message = messageRef.current.value.trimEnd();
     if (!message.length || !isUserAuthenticated) {
+      messageRef.current.value = '';
       if (editMessage.msg) {
         setEditMessage({});
       }
@@ -75,7 +92,20 @@ const ChatInput = () => {
     }
 
     if (!editMessage.msg) {
-      const res = await RCInstance.sendMessage(message);
+      messageRef.current.value = '';
+      const pendingMessage = createPendingMessage(message, user);
+      if (ECOptions.enableThreads && threadId) {
+        pendingMessage.tmid = threadId;
+      }
+      upsertMessage(pendingMessage, ECOptions.enableThreads);
+      const res = await RCInstance.sendMessage(
+        {
+          msg: pendingMessage.msg,
+          _id: pendingMessage._id,
+        },
+        ECOptions.enableThreads ? threadId : undefined
+      );
+
       if (!res.success) {
         await RCInstance.logout();
         setIsUserAuthenticated(false);
@@ -84,8 +114,9 @@ const ChatInput = () => {
           message: 'Error sending message, login again',
           position: toastPosition,
         });
+      } else {
+        replaceMessage(pendingMessage._id, res.message);
       }
-      messageRef.current.value = '';
       setDisableButton(true);
     } else {
       const res = await RCInstance.updateMessage(editMessage.id, message);
@@ -168,7 +199,7 @@ const ChatInput = () => {
       <Box marginInlineStart="x20">
         <TypingUsers />
       </Box>
-      <Box m="x20" border="2px solid #ddd">
+      <Box m="x20" border="2px solid #ddd" className={styles.containerParent}>
         {showMembersList ? (
           <MembersList
             mentionIndex={mentionIndex}
@@ -179,18 +210,26 @@ const ChatInput = () => {
         )}
         <Box className={styles.container}>
           <textarea
+            rows={1}
             disabled={!isUserAuthenticated || isRecordingMessage}
             placeholder={isUserAuthenticated ? 'Message' : 'Sign in to chat'}
             className={styles.textInput}
             onChange={(e) => {
-              messageRef.current.value = e.target.value;
+              messageRef.current.value = parseEmoji(e.target.value);
+
+              if (e.code === 'Enter') {
+                messageRef.current.value += '\n';
+              }
+
               setDisableButton(!messageRef.current.value.length);
 
               e.target.style.height = 'auto';
-              if (e.target.scrollHeight <= 150)
-                e.target.style.height = `${e.target.scrollHeight - 10}px`;
-              else e.target.style.height = '150px';
-
+              if (e.target.scrollHeight <= 150) {
+                e.target.style.boxSizing = 'border-box';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              } else {
+                e.target.style.height = '150px';
+              }
               searchToMentionUser(
                 messageRef.current.value,
                 roomMembers,
@@ -208,9 +247,16 @@ const ChatInput = () => {
                 // new line with shift enter. do nothing.
                 return;
               }
-              if (e.ctrlKey && e.keyCode === 13) {
+              if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
                 // Insert line break in text input field
                 messageRef.current.value += '\n';
+                e.target.style.height = 'auto';
+                if (e.target.scrollHeight <= 150) {
+                  e.target.style.boxSizing = 'border-box';
+                  e.target.style.height = `${e.target.scrollHeight}px`;
+                } else {
+                  e.target.style.height = '150px';
+                }
               } else if (editMessage.msg && e.keyCode === 27) {
                 messageRef.current.value = '';
                 setDisableButton(true);
@@ -263,11 +309,11 @@ const ChatInput = () => {
             <ActionButton
               bg="surface"
               border="0px"
+              onClick={sendMessage}
               disabled={disableButton || isRecordingMessage}
             >
               <Icon
                 className={styles.chatInputIconCursor}
-                onClick={sendMessage}
                 name="send"
                 size="x25"
                 padding={6}
